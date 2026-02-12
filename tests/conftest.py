@@ -10,8 +10,8 @@ import pytest
 from mocks import (  # noqa: F401 — re-exported for test modules
     MockParam, MockMixerDevice, MockDevice, MockClip, MockEnvelope,
     MockClipSlot, MockRoutingType, MockTrack, MockScene, MockGroovePool,
-    MockView, MockSong, MockBrowserItem, MockBrowser, MockApplication,
-    MockCInstance,
+    MockView, MockSong, MockBrowserItem, MockBrowser, MockAppView,
+    MockApplication, MockCInstance,
 )
 
 

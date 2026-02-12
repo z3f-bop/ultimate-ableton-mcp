@@ -97,6 +97,8 @@ class SceneHandler(object):
         scene = self._get_scene(idx)
         bpm = float(params.get("bpm", 0))
         if hasattr(scene, "tempo"):
+            if bpm > 0 and hasattr(scene, "tempo_enabled"):
+                scene.tempo_enabled = True
             scene.tempo = bpm
             return {"index": idx, "tempo": float(scene.tempo)}
         return {"index": idx, "error": "Scene tempo not supported in this Live version"}

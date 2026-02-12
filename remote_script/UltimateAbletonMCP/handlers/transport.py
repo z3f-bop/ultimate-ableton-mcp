@@ -59,11 +59,15 @@ class TransportHandler(object):
     def _show_view(self, params):
         view = params.get("view", "session")
         app = self._c.application()
+        # Live API uses string identifiers for show_view/focus_view
         view_map = {
-            "session": app.View.Session,
-            "arrangement": app.View.Arranger,
+            "session": "Session",
+            "arrangement": "Arranger",
         }
         target = view_map.get(view)
         if target is not None:
-            app.view.focus_view(target)
+            if hasattr(app.view, "show_view"):
+                app.view.show_view(target)
+            elif hasattr(app.view, "focus_view"):
+                app.view.focus_view(target)
         return {"view": view}

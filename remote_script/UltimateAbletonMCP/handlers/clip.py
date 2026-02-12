@@ -108,20 +108,25 @@ class ClipHandler(object):
         return {"loop_start": float(clip.loop_start),
                 "loop_end": float(clip.loop_end)}
 
+    # --- MIDI Notes (Live 12 extended API with legacy fallback) ---
+
+    def _build_note_tuple(self, n):
+        """Build a (pitch, start, duration, velocity, mute) tuple from note dict."""
+        pitch = int(n.get("pitch", 60))
+        start = float(n.get("start", 0))
+        duration = float(n.get("duration", 0.25))
+        velocity = int(n.get("velocity", 100))
+        mute = bool(n.get("mute", False))
+        return (pitch, start, duration, velocity, mute)
+
     def _add_notes(self, params):
         track, slot, ti, si = self._get_slot(params)
         if not slot.has_clip:
             raise RuntimeError("No clip in slot")
         clip = slot.clip
         notes = params.get("notes", [])
-        live_notes = []
-        for n in notes:
-            pitch = int(n.get("pitch", 60))
-            start = float(n.get("start", 0))
-            duration = float(n.get("duration", 0.25))
-            velocity = int(n.get("velocity", 100))
-            mute = bool(n.get("mute", False))
-            live_notes.append((pitch, start, duration, velocity, mute))
+        live_notes = [self._build_note_tuple(n) for n in notes]
+        # Legacy API — works on all Live versions
         clip.set_notes(tuple(live_notes))
         return {"added": len(live_notes)}
 
@@ -130,7 +135,19 @@ class ClipHandler(object):
         if not slot.has_clip:
             raise RuntimeError("No clip in slot")
         clip = slot.clip
-        notes_raw = clip.get_notes(0.0, 0, float(clip.length), 128)
+
+        # Try Live 12 extended API first (keyword args)
+        if hasattr(clip, "get_notes_extended"):
+            notes_raw = clip.get_notes_extended(
+                from_time=0.0,
+                from_pitch=0,
+                time_span=float(clip.length),
+                pitch_span=128
+            )
+        else:
+            # Legacy: get_notes(from_time, from_pitch, time_span, pitch_span)
+            notes_raw = clip.get_notes(0.0, 0, float(clip.length), 128)
+
         notes = []
         for n in notes_raw:
             notes.append({
@@ -138,7 +155,7 @@ class ClipHandler(object):
                 "start": float(n[1]),
                 "duration": float(n[2]),
                 "velocity": n[3],
-                "mute": n[4],
+                "mute": n[4] if len(n) > 4 else False,
             })
         return {"notes": notes, "count": len(notes)}
 
@@ -147,8 +164,17 @@ class ClipHandler(object):
         if not slot.has_clip:
             raise RuntimeError("No clip in slot")
         clip = slot.clip
-        # Remove all notes in the clip range
-        clip.remove_notes(0.0, 0, float(clip.length), 128)
+
+        if hasattr(clip, "remove_notes_extended"):
+            clip.remove_notes_extended(
+                from_pitch=0,
+                pitch_span=128,
+                from_time=0.0,
+                time_span=float(clip.length)
+            )
+        else:
+            # Legacy: remove_notes(from_time, from_pitch, time_span, pitch_span)
+            clip.remove_notes(0.0, 0, float(clip.length), 128)
         return {"removed": True}
 
     def _set_notes(self, params):
@@ -156,21 +182,24 @@ class ClipHandler(object):
         if not slot.has_clip:
             raise RuntimeError("No clip in slot")
         clip = slot.clip
+
         # Clear existing notes
-        clip.remove_notes(0.0, 0, float(clip.length), 128)
+        if hasattr(clip, "remove_notes_extended"):
+            clip.remove_notes_extended(
+                from_pitch=0, pitch_span=128,
+                from_time=0.0, time_span=float(clip.length)
+            )
+        else:
+            clip.remove_notes(0.0, 0, float(clip.length), 128)
+
         # Add new ones
         notes = params.get("notes", [])
-        live_notes = []
-        for n in notes:
-            pitch = int(n.get("pitch", 60))
-            start = float(n.get("start", 0))
-            duration = float(n.get("duration", 0.25))
-            velocity = int(n.get("velocity", 100))
-            mute = bool(n.get("mute", False))
-            live_notes.append((pitch, start, duration, velocity, mute))
+        live_notes = [self._build_note_tuple(n) for n in notes]
         if live_notes:
             clip.set_notes(tuple(live_notes))
         return {"set": len(live_notes)}
+
+    # --- Arrangement ---
 
     def _get_arrangement_clips(self, params):
         ti = int(params.get("track_index", 0))
@@ -193,7 +222,6 @@ class ClipHandler(object):
         track, slot, ti, si = self._get_slot(params)
         if not slot.has_clip:
             raise RuntimeError("No clip in slot")
-        # This requires the clip to be selected and using the duplicate command
         self._song.view.selected_track = track
         slot.fire()
         return {"message": "Clip fired for arrangement capture"}
@@ -212,5 +240,6 @@ class ClipHandler(object):
         return {"groove_set": False, "error": "Groove not found"}
 
     def _stop_all(self, params):
-        self._song.stop_all_clips()
+        quantized = int(params.get("quantized", 1))
+        self._song.stop_all_clips(quantized)
         return {"stopped_all": True}

@@ -90,8 +90,11 @@ class MockEnvelope:
     def __init__(self):
         self.points = []
 
-    def insert_step(self, time, duration, value):
-        self.points.append((time, duration, value))
+    def insert_step(self, time, value):
+        self.points.append((time, value))
+
+    def remove_step(self, time):
+        self.points = [(t, v) for t, v in self.points if t != time]
 
 
 class MockClipSlot:
@@ -235,7 +238,7 @@ class MockSong:
     def re_enable_automation(self):
         pass
 
-    def stop_all_clips(self):
+    def stop_all_clips(self, quantized=1):
         pass
 
     def create_midi_track(self, index=-1):
@@ -306,16 +309,25 @@ class MockBrowser:
         self._loaded.append(item)
 
 
+class MockAppView:
+    """Simulates Live Application.View instance."""
+
+    def __init__(self):
+        self._current_view = "Session"
+
+    def show_view(self, view_name):
+        self._current_view = view_name
+
+    def focus_view(self, view_name):
+        self._current_view = view_name
+
+
 class MockApplication:
     """Simulates Live Application."""
 
-    class View:
-        Session = 0
-        Arranger = 1
-
     def __init__(self):
         self.browser = MockBrowser()
-        self.view = MagicMock()
+        self.view = MockAppView()
 
 
 class MockCInstance:

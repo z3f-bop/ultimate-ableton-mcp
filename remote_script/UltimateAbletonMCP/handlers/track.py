@@ -208,12 +208,16 @@ class TrackHandler(object):
     def _freeze(self, params):
         idx = int(params.get("track_index", 0))
         track = self._get_track(idx)
+        if hasattr(track, "freeze_available") and not track.freeze_available:
+            return {"index": idx, "frozen": False, "error": "Track cannot be frozen"}
         track.freeze()
         return {"index": idx, "frozen": True}
 
     def _flatten(self, params):
         idx = int(params.get("track_index", 0))
         track = self._get_track(idx)
+        if hasattr(track, "freeze_available") and not track.freeze_available:
+            return {"index": idx, "flattened": False, "error": "Track cannot be flattened"}
         track.flatten()
         return {"index": idx, "flattened": True}
 

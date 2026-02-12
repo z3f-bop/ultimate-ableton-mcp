@@ -59,7 +59,7 @@ class BrowserHandler(object):
             info = {
                 "name": child.name if hasattr(child, "name") else "Unknown",
                 "uri": child.uri if hasattr(child, "uri") else None,
-                "is_folder": hasattr(child, "children") and bool(child.children),
+                "is_folder": getattr(child, "is_folder", hasattr(child, "children") and bool(child.children)),
                 "is_loadable": hasattr(child, "is_loadable") and child.is_loadable,
             }
             if info["is_folder"] and depth + 1 < max_depth:
@@ -112,7 +112,7 @@ class BrowserHandler(object):
                 items.append({
                     "name": child.name if hasattr(child, "name") else "Unknown",
                     "uri": child.uri if hasattr(child, "uri") else None,
-                    "is_folder": hasattr(child, "children") and bool(child.children),
+                    "is_folder": getattr(child, "is_folder", hasattr(child, "children") and bool(child.children)),
                     "is_loadable": hasattr(child, "is_loadable") and child.is_loadable,
                 })
         return {"path": path, "items": items, "count": len(items)}

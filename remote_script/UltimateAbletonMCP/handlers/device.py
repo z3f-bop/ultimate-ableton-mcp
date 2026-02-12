@@ -149,7 +149,7 @@ class DeviceHandler(object):
 
     # --- Automation ---
 
-    def _get_clip_and_envelope(self, params):
+    def _get_clip_and_param(self, params):
         ti = int(params.get("track_index", 0))
         ci = int(params.get("clip_index", 0))
         di = int(params.get("device_index", 0))
@@ -165,40 +165,53 @@ class DeviceHandler(object):
         return clip, param
 
     def _get_automation(self, params):
-        clip, param = self._get_clip_and_envelope(params)
+        clip, param = self._get_clip_and_param(params)
+        if not hasattr(clip, "automation_envelope"):
+            return {"has_automation": False, "error": "automation_envelope not available"}
         envelope = clip.automation_envelope(param)
         if envelope is None:
             return {"has_automation": False}
-        # Can't easily iterate envelope points in older API
         return {"has_automation": True, "param_name": param.name}
 
     def _create_automation(self, params):
-        clip, param = self._get_clip_and_envelope(params)
-        clip.create_automation_envelope(param)
-        return {"created": True, "param_name": param.name}
+        clip, param = self._get_clip_and_param(params)
+        if hasattr(clip, "create_automation_envelope"):
+            clip.create_automation_envelope(param)
+            return {"created": True, "param_name": param.name}
+        return {"created": False, "error": "create_automation_envelope not available"}
 
     def _clear_automation(self, params):
-        clip, param = self._get_clip_and_envelope(params)
+        clip, param = self._get_clip_and_param(params)
         clip.clear_envelope(param)
         return {"cleared": True, "param_name": param.name}
 
     def _insert_automation_point(self, params):
-        clip, param = self._get_clip_and_envelope(params)
+        clip, param = self._get_clip_and_param(params)
         time = float(params.get("time", 0))
         value = float(params.get("value", 0))
+        if not hasattr(clip, "automation_envelope"):
+            return {"inserted": False, "error": "automation_envelope not available"}
         envelope = clip.automation_envelope(param)
         if envelope is None:
-            clip.create_automation_envelope(param)
-            envelope = clip.automation_envelope(param)
-        envelope.insert_step(time, 0.0, value)
+            # Try to create envelope first
+            if hasattr(clip, "create_automation_envelope"):
+                clip.create_automation_envelope(param)
+                envelope = clip.automation_envelope(param)
+            if envelope is None:
+                return {"inserted": False, "error": "Could not create envelope"}
+        # insert_step(time, value) — NOT (time, duration, value)
+        envelope.insert_step(time, value)
         return {"inserted": True, "time": time, "value": value}
 
     def _remove_automation_point(self, params):
-        clip, param = self._get_clip_and_envelope(params)
+        clip, param = self._get_clip_and_param(params)
         time = float(params.get("time", 0))
+        if not hasattr(clip, "automation_envelope"):
+            return {"removed": False, "error": "automation_envelope not available"}
         envelope = clip.automation_envelope(param)
         if envelope is None:
             return {"removed": False, "error": "No automation envelope"}
-        # Clear a small region around the point
-        envelope.insert_step(time, 0.01, float(param.value))
-        return {"removed": True, "time": time}
+        if hasattr(envelope, "remove_step"):
+            envelope.remove_step(time)
+            return {"removed": True, "time": time}
+        return {"removed": False, "error": "remove_step not available"}
